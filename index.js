@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 const express = require("express");
 
 // ===== Telegram =====
-const BOT_TOKEN = process.env.BOT_TOKEN || "PUT_YOUR_BOT_TOKEN";
+const BOT_TOKEN = process.env.BOT_TOKEN || "8124828151:AAFjrILEs-G37E6zcixB3c7SZYFGZ1T4Ito";
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ===== Firebase =====
