@@ -49,7 +49,7 @@ bot.onText(/\/scripts/, async (msg) => {
           inline_keyboard: [[
             {
               text: "⬇️ تحميل السكربت",
-              url: `https://YOUR-HTML-HOST/download.html?id=${doc.id}&tg=${msg.from.id}`
+              url: `https://xs-tau-three.vercel.ap/download.html?id=${doc.id}&tg=${msg.from.id}`
             }
           ]]
         }
