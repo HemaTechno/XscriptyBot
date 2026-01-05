@@ -19,7 +19,8 @@ const ADMINS = [5307228059]; // Telegram ID
 const app = express();
 app.use(express.json());
 
-app.listen(3000, () => console.log("API running"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("Running on port", PORT));
 
 // ===== Start =====
 bot.onText(/\/start/, (msg) => {
