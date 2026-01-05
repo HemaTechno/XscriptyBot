@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 const express = require("express");
 
 // ===== Telegram =====
-const BOT_TOKEN = "8124828151:AAFjrILEs-G37E6zcixB3c7SZYFGZ1T4Ito";
+const BOT_TOKEN = process.env.BOT_TOKEN || "PUT_YOUR_BOT_TOKEN";
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ===== Firebase =====
@@ -20,9 +20,9 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("Running on port", PORT));
+app.listen(PORT, () => console.log("🚀 Server running on port", PORT));
 
-// ===== Start =====
+// ================== /start ==================
 bot.onText(/\/start/, (msg) => {
   bot.sendMessage(
     msg.chat.id,
@@ -30,7 +30,7 @@ bot.onText(/\/start/, (msg) => {
   );
 });
 
-// ===== عرض السكربتات =====
+// ================== عرض السكربتات ==================
 bot.onText(/\/scripts/, async (msg) => {
   try {
     const snap = await db.collection("scripts").get();
@@ -43,7 +43,7 @@ bot.onText(/\/scripts/, async (msg) => {
 
       bot.sendMessage(
         msg.chat.id,
-        `📌 *${s.name}*`,
+        `📌 *${s.name}*\n📝 _${s.description}_`,
         {
           parse_mode: "Markdown",
           reply_markup: {
@@ -63,27 +63,64 @@ bot.onText(/\/scripts/, async (msg) => {
   }
 });
 
-// ================== أوامر الأدمن ==================
+// ================== إضافة سكربت بالحوار ==================
+const addState = {}; // لتخزين حالة كل أدمن
 
-// ➕ إضافة سكربت
-bot.onText(/\/add (.+)\|(.+)/, async (msg, match) => {
+bot.onText(/\/add/, (msg) => {
   if (!ADMINS.includes(msg.from.id)) return;
 
-  try {
-    await db.collection("scripts").add({
-      name: match[1].trim(),
-      finalLink: match[2].trim(),
-      created: new Date()
-    });
+  addState[msg.from.id] = { step: 1, data: {} };
+  bot.sendMessage(msg.chat.id, "📝 ارسل اسم السكربت:");
+});
 
-    bot.sendMessage(msg.chat.id, "✅ تم إضافة السكربت");
-  } catch (err) {
-    console.error(err);
-    bot.sendMessage(msg.chat.id, "❌ خطأ أثناء إضافة السكربت");
+bot.on("message", async (msg) => {
+  const id = msg.from.id;
+
+  if (!ADMINS.includes(id)) return; // فقط الأدمن
+
+  if (addState[id]) {
+    const state = addState[id];
+
+    // خطوة الاسم
+    if (state.step === 1) {
+      state.data.name = msg.text.trim();
+      state.step = 2;
+      return bot.sendMessage(msg.chat.id, "✏️ ارسل وصف السكربت:");
+    }
+
+    // خطوة الوصف
+    if (state.step === 2) {
+      state.data.description = msg.text.trim();
+      state.step = 3;
+      return bot.sendMessage(msg.chat.id, "🔗 ارسل رابط السكربت النهائي (Raw Pastebin أو GitHub):");
+    }
+
+    // خطوة الرابط
+    if (state.step === 3) {
+      state.data.finalLink = msg.text.trim();
+
+      // إضافة إلى Firebase
+      try {
+        await db.collection("scripts").add({
+          name: state.data.name,
+          description: state.data.description,
+          finalLink: state.data.finalLink,
+          created: new Date()
+        });
+
+        bot.sendMessage(msg.chat.id, `✅ تم إضافة السكربت: *${state.data.name}*`, { parse_mode: "Markdown" });
+      } catch (err) {
+        console.error(err);
+        bot.sendMessage(msg.chat.id, "❌ حصل خطأ أثناء إضافة السكربت");
+      }
+
+      // إزالة الحالة
+      delete addState[id];
+    }
   }
 });
 
-// ✏️ تعديل سكربت
+// ================== تعديل سكربت ==================
 bot.onText(/\/edit (.+)\|(.+)\|(.+)/, async (msg, match) => {
   if (!ADMINS.includes(msg.from.id)) return;
 
@@ -92,14 +129,15 @@ bot.onText(/\/edit (.+)\|(.+)\|(.+)/, async (msg, match) => {
       .where("name", "==", match[1].trim()).get();
 
     if (snap.empty) {
-      return bot.sendMessage(msg.chat.id, "❌ لم أجد سكربت بالاسم هذا");
+      return bot.sendMessage(msg.chat.id, "❌ لم أجد سكربت بهذا الاسم");
     }
 
     const updatePromises = [];
     snap.forEach(doc => {
       updatePromises.push(doc.ref.update({
         name: match[2].trim(),
-        finalLink: match[3].trim()
+        description: match[3].trim(), // وصف جديد
+        // إذا عايز تعدل الرابط كمان ممكن تضيف finalLink هنا
       }));
     });
 
@@ -111,7 +149,7 @@ bot.onText(/\/edit (.+)\|(.+)\|(.+)/, async (msg, match) => {
   }
 });
 
-// ❌ حذف سكربت
+// ================== حذف سكربت ==================
 bot.onText(/\/delete (.+)/, async (msg, match) => {
   if (!ADMINS.includes(msg.from.id)) return;
 
@@ -120,7 +158,7 @@ bot.onText(/\/delete (.+)/, async (msg, match) => {
       .where("name", "==", match[1].trim()).get();
 
     if (snap.empty) {
-      return bot.sendMessage(msg.chat.id, "❌ لم أجد سكربت بالاسم هذا");
+      return bot.sendMessage(msg.chat.id, "❌ لم أجد سكربت بهذا الاسم");
     }
 
     const deletePromises = [];
