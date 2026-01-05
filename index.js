@@ -32,30 +32,35 @@ bot.onText(/\/start/, (msg) => {
 
 // ===== عرض السكربتات =====
 bot.onText(/\/scripts/, async (msg) => {
-  const snap = await db.collection("scripts").get();
-  if (snap.empty) {
-    return bot.sendMessage(msg.chat.id, "❌ لا يوجد سكربتات");
-  }
+  try {
+    const snap = await db.collection("scripts").get();
+    if (snap.empty) {
+      return bot.sendMessage(msg.chat.id, "❌ لا يوجد سكربتات");
+    }
 
-  snap.forEach(doc => {
-    const s = doc.data();
+    snap.forEach(doc => {
+      const s = doc.data();
 
-    bot.sendMessage(
-      msg.chat.id,
-      `📌 *${s.name}*`,
-      {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: [[
-            {
-              text: "⬇️ تحميل السكربت",
-              url: `https://xs-tau-three.vercel.ap/download.html?id=${doc.id}&tg=${msg.from.id}`
-            }
-          ]]
+      bot.sendMessage(
+        msg.chat.id,
+        `📌 *${s.name}*`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [[
+              {
+                text: "⬇️ تحميل السكربت",
+                url: `https://xs-tau-three.vercel.app/download.html?id=${doc.id}&tg=${msg.from.id}`
+              }
+            ]]
+          }
         }
-      }
-    );
-  });
+      );
+    });
+  } catch (err) {
+    console.error(err);
+    bot.sendMessage(msg.chat.id, "❌ حصل خطأ، حاول مرة أخرى");
+  }
 });
 
 // ================== أوامر الأدمن ==================
@@ -64,55 +69,87 @@ bot.onText(/\/scripts/, async (msg) => {
 bot.onText(/\/add (.+)\|(.+)/, async (msg, match) => {
   if (!ADMINS.includes(msg.from.id)) return;
 
-  await db.collection("scripts").add({
-    name: match[1],
-    finalLink: match[2],
-    created: new Date()
-  });
+  try {
+    await db.collection("scripts").add({
+      name: match[1].trim(),
+      finalLink: match[2].trim(),
+      created: new Date()
+    });
 
-  bot.sendMessage(msg.chat.id, "✅ تم إضافة السكربت");
+    bot.sendMessage(msg.chat.id, "✅ تم إضافة السكربت");
+  } catch (err) {
+    console.error(err);
+    bot.sendMessage(msg.chat.id, "❌ خطأ أثناء إضافة السكربت");
+  }
 });
 
 // ✏️ تعديل سكربت
 bot.onText(/\/edit (.+)\|(.+)\|(.+)/, async (msg, match) => {
   if (!ADMINS.includes(msg.from.id)) return;
 
-  const snap = await db.collection("scripts")
-    .where("name", "==", match[1]).get();
+  try {
+    const snap = await db.collection("scripts")
+      .where("name", "==", match[1].trim()).get();
 
-  snap.forEach(doc => {
-    doc.ref.update({
-      name: match[2],
-      finalLink: match[3]
+    if (snap.empty) {
+      return bot.sendMessage(msg.chat.id, "❌ لم أجد سكربت بالاسم هذا");
+    }
+
+    const updatePromises = [];
+    snap.forEach(doc => {
+      updatePromises.push(doc.ref.update({
+        name: match[2].trim(),
+        finalLink: match[3].trim()
+      }));
     });
-  });
 
-  bot.sendMessage(msg.chat.id, "✏️ تم تعديل السكربت");
+    await Promise.all(updatePromises);
+    bot.sendMessage(msg.chat.id, "✏️ تم تعديل السكربت");
+  } catch (err) {
+    console.error(err);
+    bot.sendMessage(msg.chat.id, "❌ خطأ أثناء تعديل السكربت");
+  }
 });
 
 // ❌ حذف سكربت
 bot.onText(/\/delete (.+)/, async (msg, match) => {
   if (!ADMINS.includes(msg.from.id)) return;
 
-  const snap = await db.collection("scripts")
-    .where("name", "==", match[1]).get();
+  try {
+    const snap = await db.collection("scripts")
+      .where("name", "==", match[1].trim()).get();
 
-  snap.forEach(doc => doc.ref.delete());
+    if (snap.empty) {
+      return bot.sendMessage(msg.chat.id, "❌ لم أجد سكربت بالاسم هذا");
+    }
 
-  bot.sendMessage(msg.chat.id, "🗑️ تم حذف السكربت");
+    const deletePromises = [];
+    snap.forEach(doc => deletePromises.push(doc.ref.delete()));
+    await Promise.all(deletePromises);
+
+    bot.sendMessage(msg.chat.id, "🗑️ تم حذف السكربت");
+  } catch (err) {
+    console.error(err);
+    bot.sendMessage(msg.chat.id, "❌ خطأ أثناء حذف السكربت");
+  }
 });
 
 // ================== Verify ==================
 app.post("/verify", async (req, res) => {
   const { scriptId, tgId } = req.body;
 
-  const snap = await db.collection("scripts").doc(scriptId).get();
-  if (!snap.exists) return res.sendStatus(404);
+  try {
+    const snap = await db.collection("scripts").doc(scriptId).get();
+    if (!snap.exists) return res.sendStatus(404);
 
-  await bot.sendMessage(
-    tgId,
-    `✅ تم فتح السكربت:\n${snap.data().finalLink}`
-  );
+    await bot.sendMessage(
+      tgId,
+      `✅ تم فتح السكربت:\n${snap.data().finalLink}`
+    );
 
-  res.sendStatus(200);
+    res.sendStatus(200);
+  } catch (err) {
+    console.error(err);
+    res.sendStatus(500);
+  }
 });
