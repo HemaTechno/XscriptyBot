@@ -3,7 +3,7 @@ const admin = require("firebase-admin");
 const express = require("express");
 
 // ===== Telegram =====
-const BOT_TOKEN = "PUT_BOT_TOKEN";
+const BOT_TOKEN = "8124828151:AAFjrILEs-G37E6zcixB3c7SZYFGZ1T4Ito";
 const bot = new TelegramBot(BOT_TOKEN, { polling: true });
 
 // ===== Firebase =====
@@ -13,7 +13,7 @@ admin.initializeApp({
 const db = admin.firestore();
 
 // ===== Admin =====
-const ADMINS = [123456789]; // Telegram ID
+const ADMINS = [5307228059]; // Telegram ID
 
 // ===== Web Server =====
 const app = express();
